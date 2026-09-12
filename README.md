@@ -26,6 +26,7 @@ python -m http.server 8000
 ```
 tessdata/vie.traineddata   # ngôn ngữ tiếng Việt cho Tesseract
 app.js                     # logic OCR (Tesseract worker)
+sound.js                   # hiệu ứng âm thanh (Web Audio API) + nút tắt/bật
 ui.js                      # móc nối sự kiện giao diện (upload, drag&drop, kết quả)
 index.html                 # giao diện chính
 style.css                  # giao diện sáng hiện đại
