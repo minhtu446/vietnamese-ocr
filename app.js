@@ -8,12 +8,19 @@ const OCRApp = (() => {
   };
 
   const LANGUAGE = "vie";
-  const LANG_PATH = "tessdata";
+
+  function resolveLangPath() {
+    try {
+      return new URL("tessdata/", document.baseURI).href;
+    } catch {
+      return "tessdata";
+    }
+  }
 
   async function getWorker() {
     if (worker) return worker;
     worker = await Tesseract.createWorker(LANGUAGE, 1, {
-      langPath: LANG_PATH,
+      langPath: resolveLangPath(),
       gzip: false,
       logger: (m) => {
         if (m.status === "recognizing text" && callbacks.onProgress) {
