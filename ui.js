@@ -19,6 +19,12 @@
   const copyBtn = document.getElementById("copyBtn");
   const resetBtn = document.getElementById("resetBtn");
   const toast = document.getElementById("toast");
+  const debugWrap = document.getElementById("debugWrap");
+  const debugToggle = document.getElementById("debugToggle");
+  const debugPanel = document.getElementById("debugPanel");
+  const passList = document.getElementById("passList");
+  const dictWrap = document.getElementById("dictWrap");
+  const dictToggle = document.getElementById("dictToggle");
 
   let lastResult = "";
   let currentImageFile = null;
@@ -44,6 +50,10 @@
     currentImageFile = file;
     fontReRun.hidden = true;
     fontPrompt.hidden = true;
+    dictWrap.hidden = true;
+    debugWrap.hidden = true;
+    debugPanel.hidden = true;
+    passList.replaceChildren();
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -61,11 +71,15 @@
 
   function bindHooks() {
     OCRApp.setCallbacks({
-      onProgress: ({ stage, percent, detail, total }) => {
+      onProgress: ({ stage, percent, detail, total, results }) => {
         progressStatus.textContent = describeStage(stage, detail, total);
         const pct = Math.min(percent, 100);
         progressBar.style.width = pct + "%";
         progressPercent.textContent = pct + "%";
+        if (results && results.length) {
+          debugWrap.hidden = false;
+          renderPassLog(results);
+        }
       },
       onComplete: (result) => {
         renderResult(result);
@@ -105,7 +119,7 @@
     bindHooks();
     if (window.__sound) window.__sound.click();
     try {
-      await OCRApp.recognizeWithFont(currentImageFile);
+      await OCRApp.recognizeWithFont(currentImageFile, null, { useDict: dictToggle.checked });
     } catch (err) {
       console.error(err);
     }
@@ -133,6 +147,10 @@
           otsuStretch: "nhị phân tương phản",
           otsuLow: "ngưỡng thấp",
           otsuHigh: "ngưỡng cao",
+          adaptive: "thích ứng",
+          adaptiveClean: "thích ứng sạch",
+          adaptiveFine: "thích ứng mảnh",
+          focus: "tách vùng chữ",
         };
         detail += (detail ? " · " : "") + (variants[result.variant] || result.variant);
       }
@@ -148,6 +166,11 @@
 
     fontPrompt.hidden = !(isEmpty || result.confidence < 62);
     fontReRun.hidden = !(fontReady && !isEmpty);
+    dictWrap.hidden = !(fontReady && !isEmpty);
+    if (result.results && result.results.length) {
+      debugWrap.hidden = false;
+      renderPassLog(result.results);
+    }
 
     lastResult = result.text;
     if (isEmpty) {
@@ -164,6 +187,42 @@
     if (stage === "template") return "Đang đối chiếu từng ký tự với font";
     if (stage === "finalize") return "Đang chọn kết quả tốt nhất";
     return "Đang xử lý";
+  }
+
+  function variantName(variant) {
+    const names = {
+      stretch: "Tương phản",
+      raw: "Ảnh gốc",
+      otsu: "Nhị phân",
+      clean: "Làm sạch",
+      otsuStretch: "Nhị phân tương phản",
+      otsuLow: "Ngưỡng thấp",
+      otsuHigh: "Ngưỡng cao",
+      adaptive: "Thích ứng",
+      adaptiveClean: "Thích ứng sạch",
+      adaptiveFine: "Thích ứng mảnh",
+      focus: "Tách vùng chữ",
+    };
+    return names[variant] || variant;
+  }
+
+  function renderPassLog(results) {
+    const frag = document.createDocumentFragment();
+    for (const r of results) {
+      const row = document.createElement("div");
+      row.className = "pass-row";
+      const header = document.createElement("div");
+      header.className = "pass-head";
+      header.textContent =
+        variantName(r.variant) + " · PSM " + r.psm + " · " + r.confidence + "%";
+      const body = document.createElement("div");
+      body.className = "pass-body";
+      body.textContent = r.text || "(rỗng)";
+      row.appendChild(header);
+      row.appendChild(body);
+      frag.appendChild(row);
+    }
+    passList.replaceChildren(frag);
   }
 
   function onFileChosen() {
@@ -225,6 +284,12 @@
   fontBtn.addEventListener("click", () => fontInput.click());
   fontInput.addEventListener("change", onFontChosen);
   fontReRun.addEventListener("click", startTemplate);
+  debugToggle.addEventListener("change", () => {
+    debugPanel.hidden = !debugToggle.checked;
+  });
+  dictToggle.addEventListener("change", () => {
+    if (window.__sound) window.__sound.click();
+  });
 
   copyBtn.addEventListener("click", async () => {
     if (!lastResult) return;
@@ -244,6 +309,10 @@
     lastResult = "";
     fontReRun.hidden = true;
     fontPrompt.hidden = true;
+    dictWrap.hidden = true;
+    debugWrap.hidden = true;
+    debugPanel.hidden = true;
+    passList.replaceChildren();
     if (window.__sound) window.__sound.click();
   });
 })();

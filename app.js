@@ -23,6 +23,12 @@ const OCRApp = (() => {
     { variant: "otsuStretch", psm: 6 },
     { variant: "otsuLow", psm: 6 },
     { variant: "otsuHigh", psm: 6 },
+    { variant: "adaptive", psm: 6 },
+    { variant: "adaptive", psm: 3 },
+    { variant: "adaptiveFine", psm: 6 },
+    { variant: "adaptiveClean", psm: 6 },
+    { variant: "focus", psm: 6 },
+    { variant: "focus", psm: 4 },
   ];
 
   function resolveLangPath() {
@@ -60,6 +66,7 @@ const OCRApp = (() => {
     const stretch = Pre.contrastStretch(grayRoot);
     const t = Pre.otsuThreshold(grayRoot);
     const tStretch = Pre.otsuThreshold(stretch);
+    const adaptive = Pre.adaptiveThreshold(grayRoot, 41, 12);
 
     return {
       stretch,
@@ -69,7 +76,26 @@ const OCRApp = (() => {
       otsuStretch: Pre.binarize(stretch, tStretch),
       otsuLow: Pre.binarize(grayRoot, Math.max(1, Math.round(t * 0.85))),
       otsuHigh: Pre.binarize(grayRoot, Math.min(254, Math.round(t * 1.15))),
+      adaptive,
+      adaptiveClean: Pre.cleanup(adaptive),
+      adaptiveFine: Pre.adaptiveThreshold(grayRoot, 25, 15),
+      focus: Pre.focusText(grayRoot),
     };
+  }
+
+  function plausibility(text) {
+    const words = (text || "").split(/\s+/).filter(Boolean);
+    if (!words.length) return 0;
+    let alpha = 0;
+    for (const w of words) {
+      const a = (w.match(/[A-Za-zÀ-ỹĂÂĐÊÔƠƯđĐ]/g) || []).length;
+      if (a >= Math.min(2, w.length)) alpha++;
+    }
+    return alpha / words.length;
+  }
+
+  function quality(res) {
+    return (0.5 + plausibility(res.text)) * res.confidence;
   }
 
   async function runPass(blob, psm) {
@@ -95,6 +121,7 @@ const OCRApp = (() => {
       const variants = buildVariants(src);
 
       let best = null;
+      const passLog = [];
       for (let i = 0; i < PASSES.length; i++) {
         const pass = PASSES[i];
         const low = 8 + i * 7;
@@ -103,8 +130,21 @@ const OCRApp = (() => {
         const res = await runPass(blob, pass.psm);
 
         if (res.text) {
-          if (!best || res.confidence > best.confidence) {
-            best = { ...res, variant: pass.variant };
+          passLog.push({
+            text: res.text,
+            confidence: res.confidence,
+            psm: pass.psm,
+            variant: pass.variant,
+          });
+          const q = quality(res);
+          if (!best || q > best._q) {
+            best = {
+              text: res.text,
+              confidence: res.confidence,
+              psm: res.psm,
+              variant: pass.variant,
+              _q: q,
+            };
           }
         }
         if (callbacks.onProgress) {
@@ -113,9 +153,10 @@ const OCRApp = (() => {
             percent: Math.min(high, 96),
             detail: i + 1,
             total: PASSES.length,
+            results: passLog.slice(),
           });
         }
-        if (best && best.confidence >= EARLY_EXIT) break;
+        if (best && best.confidence >= EARLY_EXIT && plausibility(best.text) >= 0.8) break;
       }
 
       if (callbacks.onProgress) callbacks.onProgress({ stage: "finalize", percent: 98 });
@@ -128,6 +169,7 @@ const OCRApp = (() => {
           psm: best.psm,
           variant: best.variant,
           mode: "tesseract",
+          results: passLog,
         };
       } else {
         finalResult = {
@@ -137,6 +179,7 @@ const OCRApp = (() => {
           variant: null,
           mode: "tesseract",
           empty: true,
+          results: passLog,
         };
       }
       if (callbacks.onComplete) callbacks.onComplete(finalResult);
@@ -149,7 +192,7 @@ const OCRApp = (() => {
     }
   }
 
-  async function recognizeWithFont(file, hooks) {
+  async function recognizeWithFont(file, hooks, opts) {
     if (hooks) setCallbacks(hooks);
     if (busy) {
       throw new Error("Một tác vụ OCR đang chạy. Vui lòng đợi kết quả hiện tại.");
@@ -170,7 +213,8 @@ const OCRApp = (() => {
         resolve(res);
       });
 
-      const correctedText = DictCorrect.correct(text.text);
+      const useDict = !opts || opts.useDict === undefined ? true : !!opts.useDict;
+      const correctedText = useDict ? DictCorrect.correct(text.text) : text.text;
       const result = {
         text: correctedText,
         confidence: text.confidence,
