@@ -83,8 +83,9 @@
   }
 
   function describeStage(stage) {
+    if (stage === "preprocess") return "Đang phân tích và cải thiện ảnh";
     if (stage === "init") return "Đang chuẩn bị công cụ nhận diện";
-    if (stage === "recognizing text") return "Đang đọc văn bản";
+    if (stage === "recognizing text") return "Đang đọc văn bản (so sánh nhiều chế độ)";
     return "Đang xử lý";
   }
 
