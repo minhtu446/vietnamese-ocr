@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nhận diện Chữ Việt — OCR</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7/dist/tesseract.min.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-logo" aria-hidden="true"></span>
+          <div>
+            <h1 class="brand-title">Nhận diện Chữ Việt</h1>
+            <p class="brand-subtitle">
+              Xin kính chào quý vị. Vui lòng gửi ảnh có chữ tiếng Việt, chúng tôi
+              sẽ giúp trích xuất văn bản một cách lịch sự và chính xác.
+            </p>
+          </div>
+        </div>
+        <button id="soundToggle" class="icon-button" type="button" title="Bật/tắt âm thanh">
+          <span class="sound-dot sound-on" aria-hidden="true"></span>
+          <span id="soundLabel" class="sound-label">Âm thanh: Bật</span>
+        </button>
+      </header>
+
+      <main>
+        <section
+          id="dropzone"
+          class="dropzone"
+          tabindex="0"
+          role="button"
+          aria-label="Khu vực tải ảnh lên"
+        >
+          <input id="fileInput" type="file" accept="image/*" hidden />
+          <div class="dropzone-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 16V4" />
+              <path d="m7 8 5-5 5 5" />
+              <path d="M5 20h14" />
+            </svg>
+          </div>
+          <h2 class="dropzone-title">Kéo và thả ảnh vào đây</h2>
+          <p class="dropzone-hint">hoặc nhấn vào khu vực này để chọn ảnh từ thiết bị</p>
+          <p class="dropzone-note">Hỗ trợ định dạng PNG, JPG, WEBP. Hình ảnh được xử lý ngay trong trình duyệt của quý vị.</p>
+        </section>
+
+        <div id="previewPanel" class="panel-result" hidden>
+          <div class="preview">
+            <img id="previewImg" alt="Ảnh đã chọn" />
+          </div>
+
+          <div id="progressWrap" class="progress-wrap" hidden>
+            <div class="progress-meta">
+              <span id="progressStatus">Đang xử lý</span>
+              <span id="progressPercent">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div id="resultCard" class="result-card" hidden>
+            <div class="result-head">
+              <h3 class="result-title">Kết quả nhận diện</h3>
+              <span id="confidence" class="confidence"></span>
+            </div>
+            <pre id="resultText" class="result-text"></pre>
+            <div class="result-actions">
+              <button id="copyBtn" class="button button-primary" type="button">Sao chép kết quả</button>
+              <button id="resetBtn" class="button button-ghost" type="button">Chọn ảnh khác</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="app-footer">
+        <p>Kính gửi lời cảm ơn quý vị đã sử dụng ứng dụng. Quyền riêng tư được tôn trọng — ảnh không rời khỏi thiết bị của quý vị.</p>
+      </footer>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="app.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>
