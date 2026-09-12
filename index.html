@@ -66,13 +66,25 @@
           <div id="resultCard" class="result-card" hidden>
             <div class="result-head">
               <h3 class="result-title">Kết quả nhận diện</h3>
-              <span id="confidence" class="confidence"></span>
+              <div class="result-badges">
+                <span id="modeBadge" class="mode-badge" hidden></span>
+                <span id="confidence" class="confidence"></span>
+              </div>
             </div>
             <pre id="resultText" class="result-text"></pre>
             <div class="result-actions">
               <button id="copyBtn" class="button button-primary" type="button">Sao chép kết quả</button>
+              <button id="fontBtn" class="button button-accent" type="button">
+                <span id="fontLabel">Tải font (.ttf) để tăng chính xác</span>
+              </button>
+              <input id="fontInput" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden />
+              <button id="fontReRun" class="button button-ghost" type="button" hidden>Chạy lại bằng font</button>
               <button id="resetBtn" class="button button-ghost" type="button">Chọn ảnh khác</button>
             </div>
+            <p id="fontPrompt" class="font-prompt" hidden>
+              Kết quả chưa đạt yêu cầu? Vui lòng tải file font mà nội dung trong ảnh sử dụng.
+              Ứng dụng sẽ nhận diện từng ký tự theo đúng font đó, đặc biệt hữu ích với font 3D hoặc trang trí.
+            </p>
           </div>
         </div>
       </main>
@@ -84,6 +96,9 @@
 
     <div id="toast" class="toast" hidden></div>
 
+    <script src="preprocess.js"></script>
+    <script src="template.js"></script>
+    <script src="dictionary.js"></script>
     <script src="app.js"></script>
     <script src="sound.js"></script>
     <script src="ui.js"></script>
