@@ -25,20 +25,23 @@ python -m http.server 8000
 
 ```
 tessdata/vie.traineddata   # ngôn ngữ tiếng Việt cho Tesseract
-preprocess.js              # xử lý ảnh: grayscale, contrast, Otsu, khử nhiễu, đảo nền tối
+preprocess.js              # xử lý ảnh: grayscale, contrast, Otsu, adaptive threshold, tách vùng chữ, khử nhiễu, đảo nền tối
 template.js                # chế độ font: dựng bảng glyph font + đối chiếu từng ký tự
-dictionary.js              # chỉnh lỗi chính tả tiếng Việt (an toàn, đúng 1 ký tự)
-app.js                     # OCR engine: ensemble 12 pass (Tesseract) + dispatch chế độ font
+dictionary.js              # chỉnh lỗi chính tả tiếng Việt (an toàn, đúng 1 ký tự, có thể tắt)
+app.js                     # OCR engine: ensemble 18 pass (Tesseract) + kiểm tra tính hợp lý + dispatch chế độ font
 sound.js                   # hiệu ứng âm thanh (Web Audio API) + nút tắt/bật
-ui.js                      # móc nối sự kiện giao diện (upload, font, kết quả)
+ui.js                      # móc nối sự kiện giao diện (upload, font, kết quả, bảng debug)
 index.html                 # giao diện chính
 style.css                  # giao diện sáng hiện đại
 ```
 
 ## Hai chế độ nhận diện
 
-1. **Tesseract (tự động)** — chạy 12 lần với nhiều biến thể ảnh (tương phản, nhị phân,
-   làm sạch, ngưỡng thấp/cao...) và nhiều PSM; tự chọn kết quả tốt nhất. Xử lý đa số ảnh.
+1. **Tesseract (tự động)** — chạy 18 lần với nhiều biến thể ảnh (tương phản, nhị phân,
+   nhị phân thích ứng, tách vùng chữ, làm sạch, ngưỡng thấp/cao...) và nhiều PSM; tính điểm
+   theo độ hợp lý của văn bản tiếng Việt trước khi chọn kết quả tốt nhất. Mở "Hiện chi tiết
+   từng lượt" để xem kết quả mỗi biến thể. Xử lý tốt cả ảnh chữ đè ảnh chụp/nền tối.
 2. **Theo font (chính xác với chữ 3D/trang trí)** — nhấn "Tải font (.ttf)" và cung cấp
    font mà nội dung trong ảnh sử dụng. Ứng dụng dựng bảng glyph từ font đó, cắt từng ký tự
-   và đối chiếu để nhận diện (đặc biệt hữu ích với font 3D, bevel, bóng đổ).
+   và đối chiếu để nhận diện (đặc biệt hữu ích với font 3D, bevel, bóng đổ). Có thể tắt
+   "Tự sửa theo từ điển tiếng Việt" nếu muốn giữ kết quả thô.

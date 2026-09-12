@@ -81,10 +81,25 @@
               <button id="fontReRun" class="button button-ghost" type="button" hidden>Chạy lại bằng font</button>
               <button id="resetBtn" class="button button-ghost" type="button">Chọn ảnh khác</button>
             </div>
+            <label id="dictWrap" class="inline-toggle" hidden>
+              <input id="dictToggle" type="checkbox" checked />
+              <span>Tự sửa theo từ điển tiếng Việt</span>
+            </label>
             <p id="fontPrompt" class="font-prompt" hidden>
               Kết quả chưa đạt yêu cầu? Vui lòng tải file font mà nội dung trong ảnh sử dụng.
               Ứng dụng sẽ nhận diện từng ký tự theo đúng font đó, đặc biệt hữu ích với font 3D hoặc trang trí.
             </p>
+          </div>
+
+          <div id="debugWrap" class="debug-wrap" hidden>
+            <label class="inline-toggle">
+              <input id="debugToggle" type="checkbox" />
+              <span>Hiện chi tiết từng lượt nhận diện</span>
+            </label>
+            <div id="debugPanel" class="debug-panel" hidden>
+              <p class="debug-note">Mỗi lượt là một cách xử lý ảnh khác nhau (độ tương phản, nhị phân, vùng chữ...). So sánh giúp tìm ra cách đọc tốt nhất.</p>
+              <div id="passList" class="pass-list"></div>
+            </div>
           </div>
         </div>
       </main>
