@@ -8,9 +8,22 @@ const OCRApp = (() => {
   };
 
   const LANGUAGE = "vie";
-  const PSM_BEST = 6;
-  const PSM_FALLBACK = 3;
-  const activeWindow = { low: 0, high: 100 };
+  const EARLY_EXIT = 88;
+
+  const PASSES = [
+    { variant: "stretch", psm: 6 },
+    { variant: "stretch", psm: 3 },
+    { variant: "stretch", psm: 4 },
+    { variant: "raw", psm: 6 },
+    { variant: "raw", psm: 3 },
+    { variant: "otsu", psm: 6 },
+    { variant: "otsu", psm: 3 },
+    { variant: "clean", psm: 6 },
+    { variant: "clean", psm: 3 },
+    { variant: "otsuStretch", psm: 6 },
+    { variant: "otsuLow", psm: 6 },
+    { variant: "otsuHigh", psm: 6 },
+  ];
 
   function resolveLangPath() {
     try {
@@ -25,19 +38,11 @@ const OCRApp = (() => {
     worker = await Tesseract.createWorker(LANGUAGE, 1, {
       langPath: resolveLangPath(),
       gzip: false,
-      logger: (m) => {
-        if (m.status === "recognizing text" && callbacks.onProgress) {
-          const raw = Math.round((m.progress || 0) * 100);
-          const pct =
-            activeWindow.low +
-            Math.round((raw / 100) * (activeWindow.high - activeWindow.low));
-          callbacks.onProgress({ stage: m.status, percent: pct });
-        }
-      },
+      logger: () => {},
     });
     await worker.setParameters({
-      user_defined_dpi: "300",
       preserve_interword_spaces: "1",
+      tessedit_do_invert: "0",
     });
     return worker;
   }
@@ -46,83 +51,30 @@ const OCRApp = (() => {
     Object.assign(callbacks, hooks);
   }
 
-  function loadImage(file) {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => resolve({ img, url });
-      img.onerror = (err) => {
-        URL.revokeObjectURL(url);
-        reject(err);
-      };
-      img.src = url;
-    });
+  function buildVariants(src) {
+    let base = Pre.scaledCopy(src);
+    const inverted = Pre.isDarkBackground(base);
+    if (inverted) base = Pre.invert(base);
+
+    const grayRoot = Pre.gray(base);
+    const stretch = Pre.contrastStretch(grayRoot);
+    const t = Pre.otsuThreshold(grayRoot);
+    const tStretch = Pre.otsuThreshold(stretch);
+
+    return {
+      stretch,
+      raw: grayRoot,
+      otsu: Pre.binarize(grayRoot, t),
+      clean: Pre.cleanup(Pre.binarize(grayRoot, t)),
+      otsuStretch: Pre.binarize(stretch, tStretch),
+      otsuLow: Pre.binarize(grayRoot, Math.max(1, Math.round(t * 0.85))),
+      otsuHigh: Pre.binarize(grayRoot, Math.min(254, Math.round(t * 1.15))),
+    };
   }
 
-  async function preprocess(file) {
-    const { img, url } = await loadImage(file);
-    try {
-      const srcW = img.naturalWidth;
-      const srcH = img.naturalHeight;
-      let scale = 2;
-      if (srcW >= 1500) scale = 1.5;
-      const w = Math.round(srcW * scale);
-      const h = Math.round(srcH * scale);
-
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, w, h);
-
-      const imageData = ctx.getImageData(0, 0, w, h);
-      const d = imageData.data;
-      const pixelCount = w * h;
-      const lum = new Uint8ClampedArray(pixelCount);
-
-      let min = 255;
-      let max = 0;
-      for (let i = 0, p = 0; i < pixelCount; i++, p += 4) {
-        const l = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
-        lum[i] = l;
-        if (l < min) min = l;
-        if (l > max) max = l;
-      }
-
-      let lo = min;
-      let hi = max;
-      if (hi - lo < 32) {
-        lo = 0;
-        hi = 255;
-      }
-      const span = hi - lo || 1;
-      const gain = 255 / span;
-
-      for (let i = 0, p = 0; i < pixelCount; i++, p += 4) {
-        const v = (lum[i] - lo) * gain;
-        const g = v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
-        d[p] = g;
-        d[p + 1] = g;
-        d[p + 2] = g;
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-
-      return await new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), "image/png");
-      });
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  async function runPass(blob, psm, window) {
+  async function runPass(blob, psm) {
     const w = await getWorker();
     await w.setParameters({ tessedit_pageseg_mode: String(psm) });
-    activeWindow.low = window.low;
-    activeWindow.high = window.high;
     const { data } = await w.recognize(blob);
     return {
       text: data.text.trim(),
@@ -131,26 +83,102 @@ const OCRApp = (() => {
     };
   }
 
-  async function loadFile(file) {
+  async function recognize(file, hooks) {
+    if (hooks) setCallbacks(hooks);
+    if (busy) {
+      throw new Error("Một tác vụ OCR đang chạy. Vui lòng đợi kết quả hiện tại.");
+    }
+    busy = true;
+    try {
+      if (callbacks.onProgress) callbacks.onProgress({ stage: "preprocess", percent: 1 });
+      const src = await Pre.canvasFromFile(file);
+      const variants = buildVariants(src);
+
+      let best = null;
+      for (let i = 0; i < PASSES.length; i++) {
+        const pass = PASSES[i];
+        const low = 8 + i * 7;
+        const high = low + 7;
+        const blob = await Pre.toBlob(variants[pass.variant]);
+        const res = await runPass(blob, pass.psm);
+
+        if (res.text) {
+          if (!best || res.confidence > best.confidence) {
+            best = { ...res, variant: pass.variant };
+          }
+        }
+        if (callbacks.onProgress) {
+          callbacks.onProgress({
+            stage: "passes",
+            percent: Math.min(high, 96),
+            detail: i + 1,
+            total: PASSES.length,
+          });
+        }
+        if (best && best.confidence >= EARLY_EXIT) break;
+      }
+
+      if (callbacks.onProgress) callbacks.onProgress({ stage: "finalize", percent: 98 });
+
+      let finalResult;
+      if (best) {
+        finalResult = {
+          text: best.text,
+          confidence: best.confidence,
+          psm: best.psm,
+          variant: best.variant,
+          mode: "tesseract",
+        };
+      } else {
+        finalResult = {
+          text: "",
+          confidence: 0,
+          psm: null,
+          variant: null,
+          mode: "tesseract",
+          empty: true,
+        };
+      }
+      if (callbacks.onComplete) callbacks.onComplete(finalResult);
+      return finalResult;
+    } catch (err) {
+      if (callbacks.onError) callbacks.onError(err);
+      throw err;
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function recognizeWithFont(file, hooks) {
+    if (hooks) setCallbacks(hooks);
     if (busy) {
       throw new Error("Một tác vụ OCR đang chạy. Vui lòng đợi kết quả hiện tại.");
     }
     busy = true;
     try {
       if (callbacks.onProgress) callbacks.onProgress({ stage: "preprocess", percent: 2 });
-      const processed = await preprocess(file);
+      const src = await Pre.canvasFromFile(file);
+      const text = await new Promise((resolve) => {
+        const res = TemplateOCR.recognize(src, (pct) => {
+          if (callbacks.onProgress) {
+            callbacks.onProgress({
+              stage: "template",
+              percent: Math.min(8 + Math.round(pct * 0.88), 96),
+            });
+          }
+        });
+        resolve(res);
+      });
 
-      const pass1 = await runPass(processed, PSM_BEST, { low: 20, high: 55 });
-      const results = [pass1];
-
-      if (pass1.text) {
-        const pass2 = await runPass(processed, PSM_FALLBACK, { low: 60, high: 95 });
-        results.push(pass2);
-      }
-
-      const best = results.reduce((a, b) => (b.confidence > a.confidence ? b : a));
-      if (callbacks.onComplete) callbacks.onComplete(best);
-      return best;
+      const correctedText = DictCorrect.correct(text.text);
+      const result = {
+        text: correctedText,
+        confidence: text.confidence,
+        mode: "template",
+        chars: TemplateOCR.getTemplateCount(),
+      };
+      if (callbacks.onComplete) callbacks.onComplete(result);
+      return result;
     } catch (err) {
       if (callbacks.onError) callbacks.onError(err);
       throw err;
@@ -166,5 +194,5 @@ const OCRApp = (() => {
     }
   }
 
-  return { loadFile, setCallbacks, terminate };
+  return { recognize, recognizeWithFont, loadFontFile: (f) => TemplateOCR.loadFont(f), setCallbacks, terminate };
 })();

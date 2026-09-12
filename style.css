@@ -248,7 +248,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.result-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .result-title {
@@ -263,6 +272,25 @@ body {
   background: var(--success-bg);
   padding: 5px 12px;
   border-radius: 999px;
+}
+
+.mode-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-strong);
+  background: #e6eeff;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+.font-prompt {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+  background: var(--surface-soft);
+  border-radius: 12px;
+  padding: 12px 14px;
+  line-height: 1.55;
 }
 
 .result-text {
@@ -308,6 +336,17 @@ body {
 .button-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 22px rgba(79, 124, 255, 0.34);
+}
+
+.button-accent {
+  background: linear-gradient(135deg, #6dd5ed, #3a63e6);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(58, 99, 230, 0.25);
+}
+
+.button-accent:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(58, 99, 230, 0.32);
 }
 
 .button-ghost {
